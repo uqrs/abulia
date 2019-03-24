@@ -1,0 +1,45 @@
+#!/bin/sh
+#########
+# unpacks a packet of binaries (binpack-[arg]) onto the target system
+# then modifies the target system's path to use these binaries.
+#########
+ROOT="$PWD"
+PACK_LOCATION="$ROOT/binpack-";
+BIN_LOCATION="$ROOT/bin-";
+
+#
+# if binpack has already been extracted, post a message.
+#
+if [ "$(ls -1 "$ROOT" | grep -E 'bin-.*')" ]; then
+	for FILE in "$ROOT/bin-"*; do
+		echo "[w] binmake> binpath already found" 1>&2
+		echo "[w] binmake> path: \"$ROOT/"$(basename "$FILE")"\"" 1>&2
+	done
+fi;
+
+#
+# wait until the binpack makes its way onto the system 
+#
+echo "[@] binmake> waiting for binpack... (expecting $PACK_LOCATION\$ARCH)"
+while [ ! $(ls -1 "$ROOT/" | grep -E "binpack-.*" ) ]; do
+	sleep 0.5s;
+done;
+
+#
+# begin extracting every binpack.
+#
+for PACK in "$ROOT/binpack-"*; do
+	BINTARGET="$ROOT/bin-"$(basename "$PACK" | cut -d '-' -f 2);
+
+	if [ -f "$BINTARGET" ]; then
+		echo "[w] binmake> already found at \"$ROOT/"$(basename "$BINTARGET")"\"" 1>&2
+	else
+		mkdir -v -p "$BINTARGET"        || (echo -e "[E] binmake> failed to create directory \"$BINTARGET\"");
+		tar -C "$BINTARGET" -xvf "$PACK"|| (echo -e "[E] binmake> failed to extract pack into \"\$BINTARGET\"");
+		chmod -v +x "$BINTARGET/"*      || (echo -e "[E] binmake> failed to mark files executable");
+		echo "[@] binmake> Successfully extracted the following binaries:"
+
+		ls -1 "$BINTARGET/"* | xargs realpath 2>"/dev/null"
+		echo "export PATH=\"\$PATH:$BINTARGET\";" >> abuliarc
+	fi;
+done;
