@@ -5,7 +5,7 @@ remote code execution.
 abulia requires:
 - netcat to be installed on both the host and target system; the target system's netcat implementation will need to support the `-e` flag.
 - read-write access on the current directory on the remote system
-- the target system to be executing `netcat -e /bin/sh -vlp 4444'; this will have to be done by utilising a different exploit
+- the target system to be executing `netcat -e /bin/sh -vlp 4444`; this will have to be done by utilising a different exploit
 
 ## Usage
 ### Regular Invocation
@@ -36,14 +36,6 @@ right; if payload B depends on payload A, then `./abulia 192.0.2.0 8888 +B A` wi
 
 abulia uses `dd` and `netcat` for file transmission, and can handle payloads of arbitrary size (including 200MiB+ wordlists).
 
-## Todo
-abulia has several issues that need to be fixed:
-- abulia does not yet support other ways of attaining a reverse shell (nmap, lua, irb, etc.)- it currently relies on `python` and `pty`.
-- abulia does not yet support other ways of initiating connections other than netcat; no support for `socat` or gnu/awk+network-based shelling.
-- abulia produces one or two lines of garbage on the screen when achieving a reverse shell; this has yet to be fixed.
-- abulia relies on some ugly hacks and `timing` to keep working; this is ugly and should ideally be fixed.
-- exiting the abulia shell renders your terminal garbage, requiring you to close it.
-
 ## Payload Overview
 ### understand
 the `understand` payload shows a fancy header displaying information such as disk usage, `uname`, SSH configuration, etc.
@@ -62,3 +54,11 @@ GNU/Linux operating systems. They were stolen from [https://github.com/andrew-d/
 `binmake` depends on one or more of each `binpack-$ARCH` to have been transferred to the target system.
 `binmake` will create a new subdirectory `$PWD/.abulia/binpack-$ARCH` before unpacking the statically linked binaries found in the pack.
 It will then modify the `$PATH` variable in `$PWD/.abulia/abuliarc`.
+
+## Todo
+abulia has several issues that need to be fixed:
+- abulia does not yet support other ways of attaining a reverse shell (nmap, lua, irb, etc.)- it currently relies on `python` and `pty`.
+- abulia does not yet support other ways of initiating connections other than netcat; no support for `socat` or gnu/awk+network-based shelling.
+- abulia produces one or two lines of garbage on the screen when achieving a reverse shell; this has yet to be fixed.
+- abulia relies on some ugly hacks and `timing` to keep working; this is ugly and should ideally be fixed.
+- exiting the abulia shell renders your terminal garbage, requiring you to close it.
