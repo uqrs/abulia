@@ -5,7 +5,7 @@ remote code execution.
 abulia requires:
 - netcat to be installed on both the host and target system; the target system's netcat implementation will need to support the `-e` flag.
 - read-write access on the current directory on the remote system
-- the target system to be executing `netcat -e /bin/sh -vlp 4444`; this will have to be done by utilising a different exploit
+- the target system to be executing `netcat -e /bin/sh -vlp 8888`; this will have to be done by utilising a different exploit. (any port may be used; `8888` is used as an example here.)
 
 ## Usage
 ### Regular Invocation
