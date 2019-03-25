@@ -9,7 +9,7 @@ abulia requires:
 
 ## Usage
 ### Regular Invocation
-The simplst way to invoke abulia is:
+The simplest way to invoke abulia is:
 ```bash
 ./abulia 192.0.2.0 8888
 ```
