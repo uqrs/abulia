@@ -19,6 +19,14 @@ elif [ -f "/etc/ssh/sshd_config" ]; then
 	SSH_PORTS="Ports: "$(grep -Eo '^ *Port ([0-9]+) *$' <"/etc/ssh/sshd_config"  | awk '{ OUT=OUT ", " $2 }; END{print substr(OUT,3)}')
 	SSH_PROTOCOL="SSH Protocol Version: "$(tac "/etc/ssh/sshd_config" | awk '$1 == "Protocol" { print $2 ; exit}')
 	SSH_ALLOWROOT="Root Login Allowed: "$(tac "/etc/ssh/sshd_config" | awk '$1 == "PermitRootLogin" { print $2 ; exit}')
+
+	ls "$HOME/.ssh/" | grep '.*\.pub' >"/dev/null";
+
+	if [ $? == 0 ]; then
+		SSH_KEYS="SSH Keys: '$HOME/.ssh/': "$(find "$HOME/.ssh/" -name '*.pub' | xargs cut -d ' ' -f 3  | tr '\n' ',' | sed 's/,/, /; s/, $//')
+	else
+		SSH_KEYS="No SSH keys found in '$HOME/.ssh/'";
+	fi
 fi;
 
 
@@ -39,5 +47,6 @@ cat <<EOF
 ┃ $SSH_PORTS$(makepad "$SSH_PORTS")┃
 ┃ $SSH_PROTOCOL$(makepad "$SSH_PROTOCOL")┃
 ┃ $SSH_ALLOWROOT$(makepad "$SSH_ALLOWROOT")┃
+┃ $SSH_KEYS$(makepad "$SSH_KEYS")┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 EOF
