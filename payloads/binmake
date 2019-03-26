@@ -41,6 +41,6 @@ for PACK in "$ROOT/binpack-"*; do
 
 		ls -1 "$BINTARGET/"* | xargs realpath 2>"/dev/null"
 		# Set our new path variable.
-		echo "export PATH=\"\$PATH:$BINTARGET\"" >"$ROOT/abuliarc";
+		echo "export PATH=\"\$PATH:$BINTARGET\"" >>"$ROOT/abuliarc";
 	fi;
 done;
