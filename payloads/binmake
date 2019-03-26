@@ -3,7 +3,7 @@
 # unpacks a packet of binaries (binpack-[arg]) onto the target system
 # then modifies the target system's path to use these binaries.
 #########
-ROOT="$PWD"
+ROOT="$PWD/.abulia/"
 PACK_LOCATION="$ROOT/binpack-";
 BIN_LOCATION="$ROOT/bin-";
 
@@ -40,6 +40,7 @@ for PACK in "$ROOT/binpack-"*; do
 		echo "[@] binmake> Successfully extracted the following binaries:"
 
 		ls -1 "$BINTARGET/"* | xargs realpath 2>"/dev/null"
-		echo "export PATH=\"\$PATH:$BINTARGET\";" >> abuliarc
+		# Set our new path variable.
+		echo "export PATH=\"\$PATH:$BINTARGET\"" >"$ROOT/abuliarc";
 	fi;
 done;
